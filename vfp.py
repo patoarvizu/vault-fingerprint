@@ -80,6 +80,10 @@ def init(address, key_shares, encryption_key_file, encryption_init_output_file):
         key_file.write(key)
         key_file.close()
 
+        print("Root token: " + u["root_token"])
+        print("Encrypted unseal keys are in " + encryption_init_output_file)
+        print("Encryption key for unseal keys is in " + encryption_key_file)
+
     except Exception as e:
         print('Operation failed!')
         print('Exception message: ' + str(e))
