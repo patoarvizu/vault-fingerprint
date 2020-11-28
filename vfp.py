@@ -48,7 +48,7 @@ def __readUntilFound(f):
 @click.option('-encryption-key-file', default="fingerprint-encryption.key")
 @click.option('-encryption-init-output-file', default="encrypted-init-output.json")
 @click.pass_context
-def main(ctx, address):
+def main(ctx, address, encryption_key_file, encryption_init_output_file):
     ctx.obj = {
         'address': address,
         'encryption_key_file': encryption_key_file,
