@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from pyfingerprint.pyfingerprint import PyFingerprint
@@ -68,7 +68,7 @@ def init(address, key_shares, encryption_key_file, encryption_init_output_file):
         encrypted_init_output = {}
         encrypted_keys = []
         for k in u["keys"]:
-            encrypted_keys.append(f.encrypt(k.encode()))
+            encrypted_keys.append(f.encrypt(k.encode()).decode())
 
         encrypted_init_output['encrypted_keys'] = encrypted_keys
 
@@ -77,7 +77,7 @@ def init(address, key_shares, encryption_key_file, encryption_init_output_file):
         o.close()
 
         key_file = open(encryption_key_file, "w")
-        key_file.write(key)
+        key_file.write(key.decode())
         key_file.close()
 
         print("Root token: " + u["root_token"])
@@ -105,13 +105,50 @@ def unseal(address, encryption_key_file, encryption_init_output_file):
         e = json.loads(o.read())
 
         for unseal_key in e["encrypted_keys"]:
-            payload = { 'key': f.decrypt(unseal_key.encode()) }
+            payload = { 'key': f.decrypt(unseal_key.encode()).decode() }
             r = requests.put(address + '/v1/sys/unseal', data=json.dumps(payload), headers = { 'X-Vault-Request': 'true' })
-
 
     except Exception as e:
         print('Operation failed!')
         print('Exception message: ' + str(e))
+        exit(1)
+
+@main.command()
+@click.option('-address', default='http://127.0.0.1:8200')
+@click.option('-encryption-key-file', default="fingerprint-encryption.key")
+@click.option('-encryption-init-output-file', default="encrypted-init-output.json")
+def generate_root(address, encryption_key_file, encryption_init_output_file):
+    f = __initSensor()
+    __readUntilFound(f)
+
+    try:
+        key_file = open(encryption_key_file, "r")
+        f = Fernet(key_file.read())
+
+        o = open(encryption_init_output_file, "r")
+        e = json.loads(o.read())
+
+        r = requests.put(address + '/v1/sys/generate-root/attempt')
+        attempt = json.loads(r.text)
+        nonce = attempt["nonce"]
+        otp = attempt["otp"]
+        progress = None
+
+        for unseal_key in e["encrypted_keys"]:
+            payload = { 'key': f.decrypt(unseal_key.encode()).decode(), 'nonce': nonce }
+            r = requests.put(address + '/v1/sys/generate-root/update', data=json.dumps(payload))
+            progress = json.loads(r.text)
+            if progress["complete"] == True:
+                break
+
+        print("Root token generation complete, to get the decoded token run:")
+        print("  vault operator generate-root -decode=" + progress["encoded_root_token"] + " -otp=" + otp)
+
+    except Exception as e:
+        print('Operation failed!')
+        print('Exception message: ' + str(e))
+        print('The root token generation process will be reset')
+        requests.delete(address + '/v1/sys/generate-root/attempt')
         exit(1)
 
 @main.command()
