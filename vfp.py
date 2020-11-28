@@ -51,7 +51,9 @@ def main():
 @main.command()
 @click.option('-address', default='http://127.0.0.1:8200')
 @click.option('-key-shares', default=5, type=int)
-def init(address, key_shares):
+@click.option('-encryption-key-file', default="fingerprint-encryption.key")
+@click.option('-encryption-init-output-file', default="encrypted-init-output.json")
+def init(address, key_shares, encryption_key_file, encryption_init_output_file):
     f = __initSensor()
     __readUntilFound(f)
 
@@ -70,11 +72,11 @@ def init(address, key_shares):
 
         encrypted_init_output['encrypted_keys'] = encrypted_keys
 
-        o = open("encrypted-init-output.json", "w")
+        o = open(encryption_init_output_file, "w")
         o.write(json.dumps(encrypted_init_output))
         o.close()
 
-        key_file = open("fingerprint-encryption.key", "w")
+        key_file = open(encryption_key_file, "w")
         key_file.write(key)
         key_file.close()
 
@@ -85,15 +87,17 @@ def init(address, key_shares):
 
 @main.command()
 @click.option('-address', default='http://127.0.0.1:8200')
-def unseal(address):
+@click.option('-encryption-key-file', default="fingerprint-encryption.key")
+@click.option('-encryption-init-output-file', default="encrypted-init-output.json")
+def unseal(address, encryption_key_file, encryption_init_output_file):
     f = __initSensor()
     __readUntilFound(f)
 
     try:
-        key_file = open("fingerprint-encryption.key", "r")
+        key_file = open(encryption_key_file, "r")
         f = Fernet(key_file.read())
 
-        o = open("encrypted-init-output.json", "r")
+        o = open(encryption_init_output_file, "r")
         e = json.loads(o.read())
 
         for unseal_key in e["encrypted_keys"]:
