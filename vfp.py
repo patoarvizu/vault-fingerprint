@@ -11,8 +11,8 @@ import time
 
 def __initSensor(device):
     try:
-        f = PyFingerprint(device, 57600, 0xFFFFFFFF, 0x00000000)
-        if ( f.verifyPassword() == False ):
+        fingerprint_device = PyFingerprint(device, 57600, 0xFFFFFFFF, 0x00000000)
+        if ( fingerprint_device.verifyPassword() == False ):
             raise ValueError('The given fingerprint sensor password is wrong!')
 
     except Exception as e:
@@ -20,17 +20,17 @@ def __initSensor(device):
         print('Exception message: ' + str(e))
         exit(1)
 
-    return f
+    return fingerprint_device
 
-def __readUntilFound(f):
+def __readUntilFound(fingerprint_device):
     while True:
         try:
             print('Waiting for finger...')
-            while ( f.readImage() == False ):
+            while ( fingerprint_device.readImage() == False ):
                 pass
 
-            f.convertImage(0x01)
-            result = f.searchTemplate()
+            fingerprint_device.convertImage(0x01)
+            result = fingerprint_device.searchTemplate()
             positionNumber = result[0]
             if ( positionNumber == -1 ):
                 print('No match found!')
@@ -66,30 +66,29 @@ def init(ctx, key_shares):
     encryption_key_file = ctx.obj['encryption_key_file']
     encryption_init_output_file = ctx.obj['encryption_init_output_file']
     device = ctx.obj['device']
-    f = __initSensor(device)
-    __readUntilFound(f)
+    fingerprint_device = __initSensor(device)
+    __readUntilFound(fingerprint_device)
 
     try:
         key = Fernet.generate_key()
-        f = Fernet(key)
-
+        fernet = Fernet(key)
         payload = { 'secret_shares': key_shares, 'secret_threshold': key_shares, 'stored_shares': key_shares, 'recovery_shares': key_shares, 'recovery_threshold': key_shares }
-        r = requests.put(address + '/v1/sys/init', data=json.dumps(payload), headers = { 'X-Vault-Request': 'true' })
-        u = json.loads(r.text)
+        request_result = requests.put(address + '/v1/sys/init', data=json.dumps(payload), headers = { 'X-Vault-Request': 'true' })
+        result_json = json.loads(request_result.text)
         encrypted_init_output = {}
         encrypted_keys = []
-        for k in u["keys"]:
-            encrypted_keys.append(f.encrypt(k.encode()).decode())
+        for unseal_key in result_json["keys"]:
+            encrypted_keys.append(fernet.encrypt(unseal_key.encode()).decode())
 
         encrypted_init_output['encrypted_keys'] = encrypted_keys
-        o = open(encryption_init_output_file, "w")
-        o.write(json.dumps(encrypted_init_output))
-        o.close()
+        unseal_keys_file = open(encryption_init_output_file, "w")
+        unseal_keys_file.write(json.dumps(encrypted_init_output))
+        unseal_keys_file.close()
         key_file = open(encryption_key_file, "w")
         key_file.write(key.decode())
         key_file.close()
 
-        print("Root token: " + u["root_token"])
+        print("Root token: " + result_json["root_token"])
         print("Encrypted unseal keys are in " + encryption_init_output_file)
         print("Encryption key for unseal keys is in " + encryption_key_file)
 
@@ -105,19 +104,17 @@ def unseal(ctx):
     encryption_key_file = ctx.obj['encryption_key_file']
     encryption_init_output_file = ctx.obj['encryption_init_output_file']
     device = ctx.obj['device']
-    f = __initSensor(device)
-    __readUntilFound(f)
+    fingerprint_device = __initSensor(device)
+    __readUntilFound(fingerprint_device)
 
     try:
         key_file = open(encryption_key_file, "r")
-        f = Fernet(key_file.read())
-
-        o = open(encryption_init_output_file, "r")
-        e = json.loads(o.read())
-
-        for unseal_key in e["encrypted_keys"]:
-            payload = { 'key': f.decrypt(unseal_key.encode()).decode() }
-            r = requests.put(address + '/v1/sys/unseal', data=json.dumps(payload), headers = { 'X-Vault-Request': 'true' })
+        fernet = Fernet(key_file.read())
+        unseal_keys_file = open(encryption_init_output_file, "r")
+        unseal_keys_object = json.loads(unseal_keys_file.read())
+        for unseal_key in unseal_keys_object["encrypted_keys"]:
+            payload = { 'key': fernet.decrypt(unseal_key.encode()).decode() }
+            requests.put(address + '/v1/sys/unseal', data=json.dumps(payload), headers = { 'X-Vault-Request': 'true' })
 
     except Exception as e:
         print('Operation failed!')
@@ -131,27 +128,26 @@ def generate_root(ctx):
     encryption_key_file = ctx.obj['encryption_key_file']
     encryption_init_output_file = ctx.obj['encryption_init_output_file']
     device = ctx.obj['device']
-    f = __initSensor(device)
-    __readUntilFound(f)
+    fingerprint_device = __initSensor(device)
+    __readUntilFound(fingerprint_device)
     try:
         key_file = open(encryption_key_file, "r")
-        f = Fernet(key_file.read())
-        o = open(encryption_init_output_file, "r")
-        e = json.loads(o.read())
-        r = requests.put(address + '/v1/sys/generate-root/attempt')
-        attempt = json.loads(r.text)
-        nonce = attempt["nonce"]
-        otp = attempt["otp"]
+        fernet = Fernet(key_file.read())
+        unseal_keys_file = open(encryption_init_output_file, "r")
+        unseal_keys_object = json.loads(unseal_keys_file.read())
+        attempt_result = requests.put(address + '/v1/sys/generate-root/attempt')
+        attempt_object = json.loads(attempt_result.text)
+        nonce = attempt_object["nonce"]
         progress = None
-        for unseal_key in e["encrypted_keys"]:
-            payload = { 'key': f.decrypt(unseal_key.encode()).decode(), 'nonce': nonce }
-            r = requests.put(address + '/v1/sys/generate-root/update', data=json.dumps(payload))
-            progress = json.loads(r.text)
+        for unseal_key in unseal_keys_object["encrypted_keys"]:
+            payload = { 'key': fernet.decrypt(unseal_key.encode()).decode(), 'nonce': nonce }
+            update_result = requests.put(address + '/v1/sys/generate-root/update', data=json.dumps(payload))
+            progress = json.loads(update_result.text)
             if progress["complete"] == True:
                 break
 
         print("Root token generation complete, to get the decoded token run:")
-        print("  vault operator generate-root -decode=" + progress["encoded_root_token"] + " -otp=" + otp)
+        print("  vault operator generate-root -decode=" + progress["encoded_root_token"] + " -otp=" + attempt_object["otp"])
 
     except Exception as e:
         print('Operation failed!')
@@ -164,15 +160,15 @@ def generate_root(ctx):
 @click.pass_context
 def enroll(ctx):
     device = ctx.obj['device']
-    f = __initSensor(device)
+    fingerprint_device = __initSensor(device)
     while True:
         try:
             print('Waiting for finger...')
-            while ( f.readImage() == False ):
+            while ( fingerprint_device.readImage() == False ):
                 pass
 
-            f.convertImage(0x01)
-            result = f.searchTemplate()
+            fingerprint_device.convertImage(0x01)
+            result = fingerprint_device.searchTemplate()
             positionNumber = result[0]
             if ( positionNumber >= 0 ):
                 print('Fingerprint already exists at position #' + str(positionNumber))
@@ -181,11 +177,11 @@ def enroll(ctx):
             print('Remove finger...')
             time.sleep(2)
             print('Place same finger again...')
-            while ( f.readImage() == False ):
+            while ( fingerprint_device.readImage() == False ):
                 pass
 
-            f.convertImage(0x02)
-            if ( f.compareCharacteristics() == 0 ):
+            fingerprint_device.convertImage(0x02)
+            if ( fingerprint_device.compareCharacteristics() == 0 ):
                 print('Fingerprints do not match, try again')
                 continue
 
@@ -197,8 +193,8 @@ def enroll(ctx):
             continue
 
     try:
-        f.createTemplate()
-        positionNumber = f.storeTemplate()
+        fingerprint_device.createTemplate()
+        positionNumber = fingerprint_device.storeTemplate()
         print('Fingerprint enrolled successfully!')
 
     except Exception as e:
