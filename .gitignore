@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+encrypted-init-output.json
+fingerprint-encryption.key
