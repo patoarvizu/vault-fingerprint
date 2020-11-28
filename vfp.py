@@ -75,7 +75,13 @@ def init(ctx, key_shares):
     try:
         key = Fernet.generate_key()
         fernet = Fernet(key)
-        payload = { 'secret_shares': key_shares, 'secret_threshold': key_shares, 'stored_shares': key_shares, 'recovery_shares': key_shares, 'recovery_threshold': key_shares }
+        payload = {
+            'secret_shares': key_shares,
+            'secret_threshold': key_shares,
+            'stored_shares': key_shares,
+            'recovery_shares': key_shares,
+            'recovery_threshold': key_shares
+        }
         request_result = requests.put(address + '/v1/sys/init', data=json.dumps(payload))
         result_json = json.loads(request_result.text)
         encrypted_init_output = {}
@@ -116,7 +122,9 @@ def unseal(ctx):
         unseal_keys_file = open(encryption_init_output_file, "r")
         unseal_keys_object = json.loads(unseal_keys_file.read())
         for unseal_key in unseal_keys_object["encrypted_keys"]:
-            payload = { 'key': fernet.decrypt(unseal_key.encode()).decode() }
+            payload = {
+                'key': fernet.decrypt(unseal_key.encode()).decode()
+            }
             requests.put(address + '/v1/sys/unseal', data=json.dumps(payload))
 
     except Exception as e:
@@ -143,7 +151,10 @@ def generate_root(ctx):
         nonce = attempt_object["nonce"]
         progress = None
         for unseal_key in unseal_keys_object["encrypted_keys"]:
-            payload = { 'key': fernet.decrypt(unseal_key.encode()).decode(), 'nonce': nonce }
+            payload = {
+                'key': fernet.decrypt(unseal_key.encode()).decode(),
+                'nonce': nonce
+            }
             update_result = requests.put(address + '/v1/sys/generate-root/update', data=json.dumps(payload))
             progress = json.loads(update_result.text)
             if progress["complete"] == True:
