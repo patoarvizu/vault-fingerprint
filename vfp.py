@@ -9,9 +9,9 @@ import hashlib
 import click
 import time
 
-def __initSensor():
+def __initSensor(device):
     try:
-        f = PyFingerprint('/dev/tty.usbserial-AR0JX6N2', 57600, 0xFFFFFFFF, 0x00000000)
+        f = PyFingerprint(device, 57600, 0xFFFFFFFF, 0x00000000)
         if ( f.verifyPassword() == False ):
             raise ValueError('The given fingerprint sensor password is wrong!')
 
@@ -47,12 +47,14 @@ def __readUntilFound(f):
 @click.option('-address', default='http://127.0.0.1:8200')
 @click.option('-encryption-key-file', default="fingerprint-encryption.key")
 @click.option('-encryption-init-output-file', default="encrypted-init-output.json")
+@click.option('-device', default="/dev/ttyUSB0")
 @click.pass_context
-def main(ctx, address, encryption_key_file, encryption_init_output_file):
+def main(ctx, address, encryption_key_file, encryption_init_output_file, device):
     ctx.obj = {
         'address': address,
         'encryption_key_file': encryption_key_file,
-        'encryption_init_output_file': encryption_init_output_file
+        'encryption_init_output_file': encryption_init_output_file,
+        'device': device
     }
     pass
 
@@ -63,7 +65,8 @@ def init(ctx, key_shares):
     address = ctx.obj['address']
     encryption_key_file = ctx.obj['encryption_key_file']
     encryption_init_output_file = ctx.obj['encryption_init_output_file']
-    f = __initSensor()
+    device = ctx.obj['device']
+    f = __initSensor(device)
     __readUntilFound(f)
 
     try:
@@ -101,7 +104,8 @@ def unseal(ctx):
     address = ctx.obj['address']
     encryption_key_file = ctx.obj['encryption_key_file']
     encryption_init_output_file = ctx.obj['encryption_init_output_file']
-    f = __initSensor()
+    device = ctx.obj['device']
+    f = __initSensor(device)
     __readUntilFound(f)
 
     try:
@@ -126,7 +130,8 @@ def generate_root(ctx):
     address = ctx.obj['address']
     encryption_key_file = ctx.obj['encryption_key_file']
     encryption_init_output_file = ctx.obj['encryption_init_output_file']
-    f = __initSensor()
+    device = ctx.obj['device']
+    f = __initSensor(device)
     __readUntilFound(f)
     try:
         key_file = open(encryption_key_file, "r")
@@ -156,8 +161,10 @@ def generate_root(ctx):
         exit(1)
 
 @main.command()
-def enroll():
-    f = __initSensor()
+@click.pass_context
+def enroll(ctx):
+    device = ctx.obj['device']
+    f = __initSensor(device)
     while True:
         try:
             print('Waiting for finger...')
