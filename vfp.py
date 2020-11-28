@@ -56,21 +56,6 @@ def init(address, key_shares):
     __readUntilFound(f)
 
     try:
-        # print('Waiting for finger...')
-        # ## Wait that finger is read
-        # while ( f.readImage() == False ):
-        #     pass
-        
-        # f.convertImage(0x01)
-
-        # result = f.searchTemplate()
-
-        # positionNumber = result[0]
-
-        # if ( positionNumber == -1 ):
-        #     print('No match found!')
-        #     exit(0)
-
         key = Fernet.generate_key()
         f = Fernet(key)
 
@@ -105,20 +90,6 @@ def unseal(address):
     __readUntilFound(f)
 
     try:
-        # print('Waiting for finger...')
-        # while ( f.readImage() == False ):
-        #     pass
-        
-        # f.convertImage(0x01)
-
-        # result = f.searchTemplate()
-
-        # positionNumber = result[0]
-
-        # if ( positionNumber == -1 ):
-        #     print('No match found!')
-        #     exit(0)
-
         key_file = open("fingerprint-encryption.key", "r")
         f = Fernet(key_file.read())
 
