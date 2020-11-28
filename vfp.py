@@ -9,9 +9,12 @@ import hashlib
 import click
 import time
 
+FINGERPRINT_CHARBUFFER1 = 0x01
+FINGERPRINT_CHARBUFFER2 = 0x02
+
 def __initSensor(device):
     try:
-        fingerprint_device = PyFingerprint(device, 57600, 0xFFFFFFFF, 0x00000000)
+        fingerprint_device = PyFingerprint(device)
         if ( fingerprint_device.verifyPassword() == False ):
             raise ValueError('The given fingerprint sensor password is wrong!')
 
@@ -29,7 +32,7 @@ def __readUntilFound(fingerprint_device):
             while ( fingerprint_device.readImage() == False ):
                 pass
 
-            fingerprint_device.convertImage(0x01)
+            fingerprint_device.convertImage()
             result = fingerprint_device.searchTemplate()
             positionNumber = result[0]
             if ( positionNumber == -1 ):
@@ -73,7 +76,7 @@ def init(ctx, key_shares):
         key = Fernet.generate_key()
         fernet = Fernet(key)
         payload = { 'secret_shares': key_shares, 'secret_threshold': key_shares, 'stored_shares': key_shares, 'recovery_shares': key_shares, 'recovery_threshold': key_shares }
-        request_result = requests.put(address + '/v1/sys/init', data=json.dumps(payload), headers = { 'X-Vault-Request': 'true' })
+        request_result = requests.put(address + '/v1/sys/init', data=json.dumps(payload))
         result_json = json.loads(request_result.text)
         encrypted_init_output = {}
         encrypted_keys = []
@@ -114,7 +117,7 @@ def unseal(ctx):
         unseal_keys_object = json.loads(unseal_keys_file.read())
         for unseal_key in unseal_keys_object["encrypted_keys"]:
             payload = { 'key': fernet.decrypt(unseal_key.encode()).decode() }
-            requests.put(address + '/v1/sys/unseal', data=json.dumps(payload), headers = { 'X-Vault-Request': 'true' })
+            requests.put(address + '/v1/sys/unseal', data=json.dumps(payload))
 
     except Exception as e:
         print('Operation failed!')
@@ -167,7 +170,7 @@ def enroll(ctx):
             while ( fingerprint_device.readImage() == False ):
                 pass
 
-            fingerprint_device.convertImage(0x01)
+            fingerprint_device.convertImage(FINGERPRINT_CHARBUFFER1)
             result = fingerprint_device.searchTemplate()
             positionNumber = result[0]
             if ( positionNumber >= 0 ):
@@ -180,7 +183,7 @@ def enroll(ctx):
             while ( fingerprint_device.readImage() == False ):
                 pass
 
-            fingerprint_device.convertImage(0x02)
+            fingerprint_device.convertImage(FINGERPRINT_CHARBUFFER2)
             if ( fingerprint_device.compareCharacteristics() == 0 ):
                 print('Fingerprints do not match, try again')
                 continue
