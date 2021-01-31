@@ -142,20 +142,45 @@ def generate_root(ctx):
     rdr = RFID()
     util = rdr.util()
     try:
-        
         attempt_result = requests.put(address + '/v1/sys/generate-root/attempt')
         attempt_object = json.loads(attempt_result.text)
         nonce = attempt_object["nonce"]
         progress = None
-        for unseal_key in unseal_keys_object["encrypted_keys"]:
-            payload = {
-                'key': key,
-                'nonce': nonce
-            }
-            update_result = requests.put(address + '/v1/sys/generate-root/update', data=json.dumps(payload))
-            progress = json.loads(update_result.text)
-            if progress["complete"] == True:
-                break
+        while True:
+            print("Place next tag")
+            rdr.wait_for_tag()
+            (error, tag_type) = rdr.request()
+            if not error:
+                (error, uid) = rdr.anticoll()
+                if not error:
+                    print("Tag detected with UID: " + str(uid[0])+"-"+str(uid[1])+"-"+str(uid[2])+"-"+str(uid[3]))
+                    util.set_tag(uid)
+                    util.auth(rdr.auth_a, [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
+                    block = 4
+                    key = ''
+                    error = False
+                    for s in range(5):
+                        if (block + 1) % 4 == 0:
+                            block += 1
+                        util.do_auth(block)
+                        error, data = rdr.read(block)
+                        if error:
+                            break
+                        else:
+                            key += bytes(data).decode()
+                        block += 1
+                    if error:
+                        print("Error, try again!")
+                        time.sleep(2)
+                        continue
+                    payload = {
+                        'key': key.rstrip('\x00'),
+                        'nonce': nonce
+                    }
+                    update_result = requests.put(address + '/v1/sys/generate-root/update', data=json.dumps(payload))
+                    progress = json.loads(update_result.text)
+                    if progress["complete"] == True:
+                        break
 
         print("Root token generation complete, to get the decoded token run:")
         print("  vault operator generate-root -decode=" + progress["encoded_root_token"] + " -otp=" + attempt_object["otp"])
