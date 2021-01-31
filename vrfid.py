@@ -6,7 +6,6 @@ import json
 import click
 import time
 from pirc522 import RFID
-import math
 
 @click.group()
 @click.option('-address', default='http://127.0.0.1:8200')
@@ -24,7 +23,6 @@ def init(ctx, key_shares):
     address = ctx.obj['address']
     rdr = RFID()
     util = rdr.util()
-    util.debug = True
     try:
         payload = {
             'secret_shares': key_shares,
@@ -37,25 +35,25 @@ def init(ctx, key_shares):
         result_json = json.loads(request_result.text)
         block = 4
         for unseal_key in result_json["keys"]:
-            print("Place tag")
-            print(unseal_key)
+            print("Unseal key: {}".format(unseal_key))
+            print("Place tag to save it")
             rdr.wait_for_tag()
             (error, tag_type) = rdr.request()
             if not error:
                 (error, uid) = rdr.anticoll()
                 if not error:
-                    print("Tag detected with UID: " + str(uid))
+                    print("Tag detected with UID: " + str(uid[0])+"-"+str(uid[1])+"-"+str(uid[2])+"-"+str(uid[3]))
                     util.set_tag(uid)
-                    util.auth(rdr.auth_b, [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
+                    util.auth(rdr.auth_a, [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
                     error = False
-                    for s in range(math.ceil(len(unseal_key) / 16)):
+                    for s in range(5):
                         if (block + 1) % 4 == 0:
                             block += 1
-                        data = [i for i in bytes(unseal_key[s*16:(s+1)*16].encode())]
-                        print(s)
-                        print(block)
-                        print(data)
                         util.do_auth(block)
+                        data = [0] * 16
+                        rdr.write(block, data)
+                        for i, d in enumerate(bytes(unseal_key[s*16:(s+1)*16].encode())):
+                            data[i] = d
                         error = rdr.write(block, data)
                         if error:
                             break
@@ -69,6 +67,7 @@ def init(ctx, key_shares):
                     print("Error calling anticoll()")
                     break
             else:
+                print(error)
                 print("Error calling request()")
                 break
             time.sleep(2)
@@ -97,13 +96,13 @@ def unseal(ctx):
             if not error:
                 (error, uid) = rdr.anticoll()
                 if not error:
-                    print("Tag detected with UID: " + str(uid))
+                    print("Tag detected with UID: " + str(uid[0])+"-"+str(uid[1])+"-"+str(uid[2])+"-"+str(uid[3]))
                     util.set_tag(uid)
-                    util.auth(rdr.auth_b, [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
+                    util.auth(rdr.auth_a, [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
                     block = 4
                     key = ''
                     error = False
-                    for s in range(4):
+                    for s in range(5):
                         if (block + 1) % 4 == 0:
                             block += 1
                         util.do_auth(block)
@@ -111,18 +110,16 @@ def unseal(ctx):
                         if error:
                             break
                         else:
-                            token += bytes(data).decode()
+                            key += bytes(data).decode()
                         block += 1
                     if error:
                         print("Error, try again!")
                         time.sleep(2)
                         continue
-                    print(key)
                     payload = {
-                        'key': key
+                        'key': key.rstrip('\x00')
                     }
                     progress = json.loads(requests.put(address + '/v1/sys/unseal', data=json.dumps(payload)).text)
-                    print(progress)
                     if not progress["sealed"]:
                         print("Vault is unsealed!")
                         break
