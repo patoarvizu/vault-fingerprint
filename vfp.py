@@ -36,7 +36,6 @@ def __readUntilFound(fingerprint_device):
             result = fingerprint_device.searchTemplate()
             positionNumber = result[0]
             if ( positionNumber == -1 ):
-                print('No match found!')
                 continue
 
             break
@@ -131,6 +130,8 @@ def unseal(ctx):
         print('Operation failed!')
         print('Exception message: ' + str(e))
         exit(1)
+
+    print("Unsealed!")
 
 @main.command()
 @click.pass_context
