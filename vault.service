@@ -1,0 +1,12 @@
+  [Unit]
+  Description=Vault
+  Requires=network-online.target
+  After=network-online.target
+
+  [Service]
+  Restart=on-failure
+  ExecStart=/usr/local/bin/vault server -config /home/pi/vault-fingerprint/config.hcl
+  ExecReload=/bin/kill -HUP $MAINPID
+
+  [Install]
+  WantedBy=multi-user.target
