@@ -33,7 +33,6 @@ def init(ctx, key_shares):
         }
         request_result = requests.put(address + '/v1/sys/init', data=json.dumps(payload))
         result_json = json.loads(request_result.text)
-        block = 4
         for unseal_key in result_json["keys"]:
             print("Unseal key: {}".format(unseal_key))
             print("Place tag to save it")
@@ -46,6 +45,7 @@ def init(ctx, key_shares):
                     util.set_tag(uid)
                     util.auth(rdr.auth_a, [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
                     error = False
+                    block = 4
                     for s in range(5):
                         if (block + 1) % 4 == 0:
                             block += 1
