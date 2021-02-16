@@ -41,7 +41,7 @@ This is a demo for learning purposes only, and as a hands-on lab for my HashiTal
 - Run `vault status` and confirm that Vault is now initialized, but not yet unsealed.
 - Run `./vfp.py unseal` and follow the instructions, using again the same fingerprint.
 - Try the following to validate that Vault is working as expected (assuming `VAULT_TOKEN` is set to the root token shown earlier):
-  - `vault secrets enable kv -path=secret`
+  - `vault secrets enable -path=secret kv`
   - `vault kv put secret/foo bar=baz`
   - `vault kv get secret/foo`
 - Run `make restart` to force Vault to get sealed. Run `vault status` to confirm.
@@ -56,7 +56,7 @@ This is a demo for learning purposes only, and as a hands-on lab for my HashiTal
 - After initializing successfully, you'll see the root token being printed on screen, as well as the two files holding the unseal keys. Copy the root token and set it to the `VAULT_TOKEN` environment variable.
 - Run `./vrfid.py unseal`, and follow the prompts on the screen. You'll be asked to scan the number of `-key-shares` you specified on the previous step (or the default of 5), one at a time. Note that the order **doesn't** matter, you can scan the cards in a different order than you use to initialize.
 - Try the following to validate that Vault is working as expected (assuming `VAULT_TOKEN` is set to the root token shown earlier):
-  - `vault secrets enable kv -path=secret`
+  - `vault secrets enable -path=secret kv`
   - `vault kv put secret/foo bar=baz`
   - `vault kv get secret/foo`
 - Run `make restart` to force Vault to get sealed. Run `vault status` to confirm.
