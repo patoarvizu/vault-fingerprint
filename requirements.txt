@@ -1,0 +1,4 @@
+pyfingerprint==1.5
+click==7.1.2
+cryptography==3.2.1
+pirc522==2.2.1
